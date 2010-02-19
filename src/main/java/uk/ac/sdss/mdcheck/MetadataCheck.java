@@ -1,6 +1,9 @@
 package uk.ac.sdss.mdcheck;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,10 +36,20 @@ public class MetadataCheck implements Runnable {
 	private final DocumentBuilderFactory dbFactory;
 	private final String inputFileName;
 	private final Document inputDoc;
-	private final String checkFileName;
-	private final Document checkDoc;
 	
 	private final TransformerFactory tFactory;
+	
+	private class Checker {
+		private final String checkFileName;
+		private final Document checkDoc;
+		
+		Checker(String checkFileName) throws SAXException, IOException, ParserConfigurationException {
+			this.checkFileName = checkFileName;
+			checkDoc = buildDocument(checkFileName);
+		}
+	}
+	
+	private List<Checker> checkers = new ArrayList<Checker>();
 	
 	/**
 	 * Global count of fatal errors across all checks.
@@ -83,8 +96,8 @@ public class MetadataCheck implements Runnable {
 		}
 		
 		MyErrorListener(String inputFileName, String checkFileName) {
-			this.inputFileName = inputFileName;
-			this.checkFileName = checkFileName;
+			this.inputFileName = new File(inputFileName).getName(); // last component of name only
+			this.checkFileName = new File(checkFileName).getName(); // last component of name only
 		}
 	}
 	
@@ -95,17 +108,19 @@ public class MetadataCheck implements Runnable {
 		return db.parse(fileName);
 	}
 	
-	private void performCheck(Document input, String inputFileName, Document check, String checkFileName)
+	private void performCheck(Document input, String inputFileName, Checker checker)
 		throws TransformerException
 	{
-		Transformer t = tFactory.newTransformer(new DOMSource(check));
-		t.setErrorListener(new MyErrorListener(inputFileName, checkFileName));
+		Transformer t = tFactory.newTransformer(new DOMSource(checker.checkDoc));
+		t.setErrorListener(new MyErrorListener(inputFileName, checker.checkFileName));
 		t.transform(new DOMSource(input), new DOMResult());
 	}
 	
 	public void run() {
 		try {
-			performCheck(inputDoc, inputFileName, checkDoc, checkFileName);
+			for (Checker check: checkers) {
+				performCheck(inputDoc, inputFileName, check);
+			}
 		} catch (TransformerConfigurationException e) {
 			croak("transformer configuration exception", e);
 		} catch (TransformerException e) {
@@ -118,6 +133,10 @@ public class MetadataCheck implements Runnable {
 		}
 	}
 
+	private void addChecker(String checkFileName) throws SAXException, IOException, ParserConfigurationException {
+		checkers.add(new Checker(checkFileName));
+	}
+	
 	/**
 	 * Constructor.
 	 * 
@@ -129,7 +148,7 @@ public class MetadataCheck implements Runnable {
 	 * @throws IOException 
 	 * @throws SAXException 
 	 */
-	private MetadataCheck(String inputFileName, String checkFileName)
+	private MetadataCheck(String inputFileName)
 		throws SAXException, IOException, ParserConfigurationException
 	{
 		/*
@@ -149,8 +168,6 @@ public class MetadataCheck implements Runnable {
 		 */
 		this.inputFileName = inputFileName;
 		inputDoc = buildDocument(inputFileName);
-		this.checkFileName = checkFileName;
-		checkDoc = buildDocument(checkFileName);
 	}
 	
 	/**
@@ -162,14 +179,17 @@ public class MetadataCheck implements Runnable {
 		/*
 		 * Parse command-line arguments.
 		 */
-		if (args.length != 2) {
-			System.err.println("Usage: MetadataCheck infile checkfile");
+		if (args.length < 2) {
+			System.err.println("Usage: MetadataCheck infile checkfile...");
 			System.exit(1);
 		}
 		
 		MetadataCheck mdc;
 		try {
-			mdc = new MetadataCheck(args[0], args[1]);
+			mdc = new MetadataCheck(args[0]);
+			for (int i = 1; i < args.length; i++) {
+				mdc.addChecker(args[i]);
+			}
 			mdc.run();
 		} catch (SAXException e) {
 			croak("SAX exception creating MetadataCheck", e);
