@@ -9,6 +9,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.ErrorListener;
+import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
@@ -40,12 +41,39 @@ public class MetadataCheck implements Runnable {
 	private final TransformerFactory tFactory;
 	
 	private class Checker {
-		private final String checkFileName;
+		/** File object representing the stylesheet */
+		private final File file;
+		
+		/** System identifier corresponding to the file. */
+		private final String systemID;
+		
+		/** DOM tree form of the stylesheet */
 		private final Document checkDoc;
 		
+		/**
+		 * Get a simple name for this stylesheet for use in error messages.
+		 * 
+		 * @return a simple name for the Checker
+		 */
+		private String getName() {
+			return this.file.getName();
+		}
+
+		/**
+		 * Generates a JAXP Source for this stylesheet.  The Source's
+		 * system ID is set to allow resolution of relative URIs within the
+		 * transform.
+		 * 
+		 * @return a JAXP Source object.
+		 */
+		private Source getSource() {
+			return new DOMSource(this.checkDoc, this.systemID);
+		}
+
 		Checker(String checkFileName) throws SAXException, IOException, ParserConfigurationException {
-			this.checkFileName = checkFileName;
-			checkDoc = buildDocument(checkFileName);
+			this.file = new File(checkFileName);
+			this.checkDoc = buildDocument(checkFileName);
+			this.systemID = this.file.toURI().toString();
 		}
 	}
 	
@@ -65,7 +93,7 @@ public class MetadataCheck implements Runnable {
 	private class MyErrorListener implements ErrorListener {
 		
 		private final String inputFileName;
-		private final String checkFileName;
+		private final String checkerName;
 		private boolean first = true;
 
 		private void recordError(TransformerException e)
@@ -74,7 +102,7 @@ public class MetadataCheck implements Runnable {
 			if (first) {
 				first = false;
 				System.err.println("*** checking " + inputFileName +
-						" with " + checkFileName);
+						" with " + checkerName);
 			}
 			System.err.println(msg);
 			if (msg.startsWith("***")) fatals++;
@@ -95,9 +123,9 @@ public class MetadataCheck implements Runnable {
 			recordError(exception);
 		}
 		
-		MyErrorListener(String inputFileName, String checkFileName) {
+		MyErrorListener(String inputFileName, String checkerName) {
 			this.inputFileName = new File(inputFileName).getName(); // last component of name only
-			this.checkFileName = new File(checkFileName).getName(); // last component of name only
+			this.checkerName = checkerName;
 		}
 	}
 	
@@ -111,8 +139,8 @@ public class MetadataCheck implements Runnable {
 	private void performCheck(Document input, String inputFileName, Checker checker)
 		throws TransformerException
 	{
-		Transformer t = tFactory.newTransformer(new DOMSource(checker.checkDoc));
-		t.setErrorListener(new MyErrorListener(inputFileName, checker.checkFileName));
+		Transformer t = tFactory.newTransformer(checker.getSource());
+		t.setErrorListener(new MyErrorListener(inputFileName, checker.getName()));
 		t.transform(new DOMSource(input), new DOMResult());
 	}
 	
