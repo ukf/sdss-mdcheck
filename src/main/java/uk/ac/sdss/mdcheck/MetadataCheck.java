@@ -24,10 +24,11 @@ import org.xml.sax.SAXException;
  * MetadataCheck
  * 
  * This application checks an input file containing SAML metadata against a set of
- * local rules expressed as an XSL stylesheet.  At some point this will be extended
- * to allow multiple rule files to be checked in sequence, and include more complex
- * checks that bring in information from the members file.  The current code is
- * more general than it needs to be, so that that forward evolution will be simpler.
+ * local rules expressed as XSL stylesheets.  At some point this may be extended
+ * to include more complex checks that bring in information from the members file.
+ * 
+ * The current code is more general than it needs to be, so that that forward
+ * evolution will be simpler.
  * 
  * @author iay
  *
@@ -80,9 +81,9 @@ public class MetadataCheck implements Runnable {
 	private List<Checker> checkers = new ArrayList<Checker>();
 	
 	/**
-	 * Global count of fatal errors across all checks.
+	 * Global count of errors across all checks.
 	 */
-	private int fatals = 0;
+	private int errors = 0;
 
 	private static void croak(String s, Exception e) {
 		e.printStackTrace();
@@ -105,7 +106,7 @@ public class MetadataCheck implements Runnable {
 						" with " + checkerName);
 			}
 			System.err.println(msg);
-			if (msg.startsWith("***")) fatals++;
+			if (msg.startsWith("[ERROR]")) errors++;
 		}
 		
 		public void error(TransformerException exception)
@@ -154,8 +155,8 @@ public class MetadataCheck implements Runnable {
 		} catch (TransformerException e) {
 			croak("transformer exception", e);
 		}
-		if (fatals != 0) {
-			System.err.println("*** FATAL ERRORS ENCOUNTERED IN " +
+		if (errors != 0) {
+			System.err.println("*** ERRORS ENCOUNTERED IN " +
 					inputFileName + " ***");
 			System.exit(1);
 		}
