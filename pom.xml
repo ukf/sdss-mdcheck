@@ -9,6 +9,12 @@
     <description>Utility to check arbitrary metadata against rulesets expressed in XSLT.</description>
     <url>http://sdss.ac.uk/</url>
     <inceptionYear>2009</inceptionYear>
+
+    <properties>
+        <checkstyle.version>2.10</checkstyle.version>
+        <checkstyle.configLocation>checkstyle.xml</checkstyle.configLocation>
+    </properties>
+
     <developers>
         <developer>
             <id>iay</id>
@@ -44,7 +50,33 @@
                     <debug>true</debug>
                 </configuration>
             </plugin>
+
+            <!--
+                Checkstyle configuration for checkstyle:* goals called directly
+                from the command line.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <configuration>
+                    <configLocation>${checkstyle.configLocation}</configLocation>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${checkstyle.version}</version>
+                <configuration>
+                    <configLocation>${checkstyle.configLocation}</configLocation>
+                </configuration>
+            </plugin>
+        </plugins>
+    </reporting>
 
 </project>
